@@ -12,7 +12,38 @@
         $('#table').DataTable({
             searching: false,
             order: [[0, 'desc']],
-            columnDefs: [{targets: [0, 1, 2, 3, 4, 5], render: $.fn.dataTable.render.text()}]
+            columnDefs: [{targets: [0, 1, 2, 3, 4, 5], render: $.fn.dataTable.render.text()}],
+            dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                "<'row'<'col-sm-12'tr>>" +
+                "<'row mt-3'<'col-12 mb-2 text-center text-md-start'i><'col-12 d-flex justify-content-center justify-content-md-end'p>>",
+            drawCallback: function (settings) {
+                var api = this.api();
+                var info = api.page.info();
+                var $pagination = $(settings.nTableWrapper).find('ul.pagination');
+
+                $pagination.find('.dt-jump-page').remove(); // Cegah duplikat
+
+                if (info.pages > 1) {
+                    var html = `<li class="page-item dt-jump-page ms-3 d-flex align-items-center">
+                            <input type="number" class="form-control form-control-sm jump-input" min="1" max="${info.pages}" placeholder="Hal" style="width: 70px;">
+                            <button class="btn btn-sm btn-primary ms-1 btn-jump">Go</button>
+                        </li>`;
+                    $pagination.append(html);
+                }
+            }
+        });
+
+        $(document).on('click', '.btn-jump', function(e) {
+            e.preventDefault();
+            var page = parseInt($(this).siblings('.jump-input').val());
+            var dataTableObj = $('#table').DataTable();
+            var info = dataTableObj.page.info();
+
+            if (page > 0 && page <= info.pages) {
+                dataTableObj.page(page - 1).draw('page');
+            } else {
+                alert('Halaman tidak valid! Masukkan angka antara 1 sampai ' + info.pages);
+            }
         });
         getData()
     });
