@@ -35,4 +35,13 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/master-items/delete/{id}', [App\Http\Controllers\MasterItemsController::class, 'delete']);
 
     Route::get('/master-items/update-random-data', [App\Http\Controllers\MasterItemsController::class, 'updateRandomData']);
+
+
+    Route::get('/category', [\App\Http\Controllers\CategoryController::class, 'index']);
+    Route::get('/category/search', [\App\Http\Controllers\CategoryController::class, 'search']);
+    Route::get('/category/form/{method}/{id?}', [\App\Http\Controllers\CategoryController::class, 'formView'])->where('method', 'new|edit');
+    Route::post('/category/form/{method}/{id?}', [\App\Http\Controllers\CategoryController::class, 'formSubmit'])->where('method', 'new|edit');
+    Route::get('/category/view/{id}', [\App\Http\Controllers\CategoryController::class, 'singleView']);
+    Route::get('/category/view/{id}/pdf', [\App\Http\Controllers\CategoryController::class, 'printView']);
+    Route::delete('/category/delete/{id}', [\App\Http\Controllers\CategoryController::class, 'delete']);
 });
