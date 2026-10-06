@@ -16,6 +16,13 @@
                 @endif
 
                 <div class="card-body">
+                    @if ($errors->any())
+                        <div class="alert alert-danger">
+                            @foreach ($errors->all() as $error)
+                                <div>{{ $error }}</div>
+                            @endforeach
+                        </div>
+                    @endif
                     @include('master_items.form.form')
                 </div>
             </div>

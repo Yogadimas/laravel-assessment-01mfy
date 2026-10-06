@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\MasterItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class MasterItemsController extends Controller
 {
@@ -14,23 +17,44 @@ class MasterItemsController extends Controller
 
     public function search(Request $request)
     {
-        $kode = $request->kode;
-        $nama = $request->nama;
-        $hargamin = $request->hargamin;
-        $hargamax = $request->hargamax;
+        $validator = Validator::make($request->all(), [
+            'kode' => 'nullable|string|max:255',
+            'nama' => 'nullable|string|max:255',
+            'hargamin' => 'nullable|integer|min:0',
+            'hargamax' => 'nullable|integer|min:0',
+        ], [
+            'min' => 'Isian :attribute tidak boleh kurang dari 0.',
+            'max' => 'Isian :attribute tidak boleh lebih dari :max karakter.',
+            'string' => 'Isian :attribute harus berupa teks.',
+            'integer' => 'Isian :attribute harus berupa angka bulat.'
+        ], [
+            'hargamin' => 'harga minimal',
+            'hargamax' => 'harga maksimal'
+        ]);
 
-        $data_search = MasterItem::query();
+        // 2. Pastikan Max >= Min
+        $validator->after(function ($validator) use ($request) {
+            if (!$validator->errors()->has('hargamin') && !$validator->errors()->has('hargamax')
+                && $request->filled('hargamin') && $request->filled('hargamax')
+                && (int)$request->input('hargamax') < (int)$request->input('hargamin')) {
+                $validator->errors()->add('hargamax', 'Harga max harus >= harga min.');
+            }
+        });
 
-        if (!empty($kode)) $data_search = $data_search->where('kode', $kode);
-        if (!empty($nama)) $data_search = $data_search->where('nama', 'LIKE', '%' . $nama . '%');
-        if (!empty($hargamin)) $data_search = $data_search->where('harga_beli', '>=', $hargamin)->where('harga_beli', '<=', $hargamax);
+        $data = $validator->validate();
+        $query = MasterItem::query();
 
-        $data_search = $data_search->select('kode', 'nama', 'jenis', 'harga_beli', 'laba', 'supplier')->orderBy('id')->get();
+        // 3. Gunakan filled() pengganti empty() agar angka 0 tetap dihitung
+        if ($request->filled('kode')) $query->where('kode', $data['kode']);
+        if ($request->filled('nama')) $query->where('nama', 'like', '%' . $data['nama'] . '%');
 
+        // 4. Pisahkan logika where harga_beli min dan max
+        if ($request->filled('hargamin')) $query->where('harga_beli', '>=', $data['hargamin']);
+        if ($request->filled('hargamax')) $query->where('harga_beli', '<=', $data['hargamax']);
 
-        return json_encode([
+        return response()->json([
             'status' => 200,
-            'data' => $data_search
+            'data' => $query->select('kode', 'nama', 'jenis', 'harga_beli', 'laba', 'supplier')->orderBy('id')->get()
         ]);
     }
 
@@ -39,7 +63,7 @@ class MasterItemsController extends Controller
         if ($method == 'new') {
             $item = [];
         } else {
-            $item = MasterItem::find($id);
+            $item = MasterItem::findOrFail($id);
         }
         $data['item'] = $item;
         $data['method'] = $method;
@@ -48,50 +72,74 @@ class MasterItemsController extends Controller
 
     public function singleView($kode)
     {
-        $data['data'] = MasterItem::where('kode', $kode)->first();
+        $data['data'] = MasterItem::where('kode', $kode)->firstOrFail();
         return view('master_items.single.index', $data);
     }
 
     public function formSubmit(Request $request, $method, $id = 0)
     {
-        if ($method == 'new') {
-            $data_item = new MasterItem;
-            $kode = MasterItem::count('id');
-            $kode = $kode + 1;
-            $kode = str_pad($kode, 5, '0', STR_PAD_LEFT);
-            sleep(3);
-        } else {
-            $data_item = MasterItem::find($id);
-            $kode = $data_item->kode;
-        }
+        $request->validate([
+            'nama' => 'required|string|max:255',
+            'harga_beli' => 'required|integer|min:0',
+            'laba' => 'required|integer|min:0',
+            'supplier' => 'required|in:Tokopaedi,Bukulapuk,TokoBagas,E Commurz,Blublu',
+            'jenis' => 'required|in:Obat,Alkes,Matkes,Umum,ATK'
+        ], [
+            'required' => 'Kolom :attribute wajib diisi.',
+            'string' => 'Kolom :attribute harus berupa teks.',
+            'max' => 'Kolom :attribute maksimal :max karakter.',
+            'integer' => 'Kolom :attribute harus berupa angka bulat.',
+            'min' => 'Kolom :attribute tidak boleh kurang dari :min.',
+            'in' => 'Pilihan :attribute tidak terdaftar di sistem.'
+        ], [
+            // Array Custom Attributes (Mengubah 'harga_beli' menjadi 'harga beli')
+            'harga_beli' => 'harga beli'
+        ]);
 
-        $data_item->nama = $request->nama;
-        $data_item->harga_beli = $request->harga_beli;
-        $data_item->laba = $request->laba;
-        $data_item->kode = $kode;
-        $data_item->supplier = $request->supplier;
-        $data_item->jenis = $request->jenis;
-        $data_item->save();
+        DB::transaction(function () use ($request, $method, $id) {
+            if ($method == 'new') {
+                $data_item = new MasterItem;
+                // Set kode sementara (UUID/acak) agar lolos validasi saat di-save yang pertama
+                $data_item->kode = (string)Str::uuid();
+            } else {
+                $data_item = MasterItem::findOrFail($id);
+            }
 
-        return redirect('master-items');
+            $data_item->nama = $request->nama;
+            $data_item->harga_beli = $request->harga_beli;
+            $data_item->laba = $request->laba;
+            $data_item->supplier = $request->supplier;
+            $data_item->jenis = $request->jenis;
+            $data_item->save();
+
+            if ($method == 'new') {
+                // Setelah disave, baru kita dapatkan ID unik Auto Increment-nya (Tahan Tabrakan)
+                // Jadikan kode unik sesungguhnya, lalu timpa save lagi.
+                $data_item->kode = str_pad((string)$data_item->id, 5, '0', STR_PAD_LEFT);
+                $data_item->save();
+            }
+        });
+
+        return redirect('master-items')->with('success', 'Data item "' . $request->nama . '" berhasil disimpan!');
     }
 
     public function delete($id)
     {
-        MasterItem::find($id)->delete();
-        return redirect('master-items');
+        $item = MasterItem::findOrFail($id);
+        $nama = $item->nama;
+        $item->delete();
+        return redirect('master-items')->with('success', 'Data item "' . $nama . '" berhasil dihapus!');
     }
 
     public function updateRandomData()
     {
         $data = MasterItem::get();
-        foreach($data as $item)
-        {
+        foreach ($data as $item) {
             $kode = $item->id;
             $kode = str_pad($kode, 5, '0', STR_PAD_LEFT);
 
-            $item->harga_beli = rand(100,1000000);
-            $item->laba = rand(10,99);
+            $item->harga_beli = rand(100, 1000000);
+            $item->laba = rand(10, 99);
             $item->kode = $kode;
             $item->supplier = $this->getRandomSupplier();
             $item->jenis = $this->getRandomJenis();
@@ -101,15 +149,15 @@ class MasterItemsController extends Controller
 
     private function getRandomSupplier()
     {
-        $array = ['Tokopaedi','Bukulapuk','TokoBagas','E Commurz','Blublu'];
-        $random = rand(0,4);
+        $array = ['Tokopaedi', 'Bukulapuk', 'TokoBagas', 'E Commurz', 'Blublu'];
+        $random = rand(0, 4);
         return $array[$random];
     }
 
     private function getRandomJenis()
     {
-        $array = ['Obat','Alkes','Matkes','Umum','ATK'];
-        $random = rand(0,4);
+        $array = ['Obat', 'Alkes', 'Matkes', 'Umum', 'ATK'];
+        $random = rand(0, 4);
         return $array[$random];
     }
 }

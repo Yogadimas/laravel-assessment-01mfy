@@ -11,6 +11,12 @@
                 <div class="card-header">Daftar Master Items</div>
 
                 <div class="card-body">
+                    @if (session('success'))
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            {{ session('success') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    @endif
                     @include('master_items.index.filter')
                     @include('master_items.index.table')
                 </div>
@@ -20,5 +26,11 @@
 </div>
 @endsection
 @section('js')
-@include('master_items.index.js')
+    <script>
+        // Menghilangkan alert otomatis setelah 3 detik (3000 ms)
+        setTimeout(function() {
+            $('.alert-success').fadeOut('slow');
+        }, 3000);
+    </script>
+    @include('master_items.index.js')
 @endsection
