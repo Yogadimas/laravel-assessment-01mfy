@@ -19,29 +19,28 @@ Route::get('/', function () {
 
 Auth::routes();
 
-// Route Publik (Hanya Home/Dashboard)
-Route::get('/', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
-
-// Route Privat (Modul Master Items -> Wajib Login)
+Route::get('/', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 Route::middleware(['auth'])->group(function () {
-    Route::get('/master-items', [App\Http\Controllers\MasterItemsController::class, 'index']);
-    Route::get('/master-items/search', [App\Http\Controllers\MasterItemsController::class, 'search']);
-    Route::get('/master-items/view/{kode}', [App\Http\Controllers\MasterItemsController::class, 'singleView']);
-    Route::get('/master-items/form/{method}/{id?}', [App\Http\Controllers\MasterItemsController::class, 'formView']);
-    Route::post('/master-items/form/{method}/{id?}', [App\Http\Controllers\MasterItemsController::class, 'formSubmit']);
+    Route::prefix('master-items')->group(function () {
+        Route::get('/', [App\Http\Controllers\MasterItemsController::class, 'index']);
+        Route::get('/search', [App\Http\Controllers\MasterItemsController::class, 'search']);
+        Route::get('/excel', [App\Http\Controllers\MasterItemsController::class, 'downloadExcel']);
+        Route::get('/foto/{filename}', [App\Http\Controllers\MasterItemsController::class, 'showFoto']);
+        Route::get('/form/{method}/{id?}', [App\Http\Controllers\MasterItemsController::class, 'formView']);
+        Route::post('/form/{method}/{id?}', [App\Http\Controllers\MasterItemsController::class, 'formSubmit']);
+        Route::get('/view/{kode}', [App\Http\Controllers\MasterItemsController::class, 'singleView']);
+        Route::delete('/delete/{id}', [App\Http\Controllers\MasterItemsController::class, 'delete']);
+        Route::get('/update-random-data', [App\Http\Controllers\MasterItemsController::class, 'updateRandomData']);
+    });
 
-    // Pastikan delete memakai method DELETE, bukan GET
-    Route::delete('/master-items/delete/{id}', [App\Http\Controllers\MasterItemsController::class, 'delete']);
-
-    Route::get('/master-items/update-random-data', [App\Http\Controllers\MasterItemsController::class, 'updateRandomData']);
-
-
-    Route::get('/category', [\App\Http\Controllers\CategoryController::class, 'index']);
-    Route::get('/category/search', [\App\Http\Controllers\CategoryController::class, 'search']);
-    Route::get('/category/form/{method}/{id?}', [\App\Http\Controllers\CategoryController::class, 'formView'])->where('method', 'new|edit');
-    Route::post('/category/form/{method}/{id?}', [\App\Http\Controllers\CategoryController::class, 'formSubmit'])->where('method', 'new|edit');
-    Route::get('/category/view/{id}', [\App\Http\Controllers\CategoryController::class, 'singleView']);
-    Route::get('/category/view/{id}/pdf', [\App\Http\Controllers\CategoryController::class, 'printView']);
-    Route::delete('/category/delete/{id}', [\App\Http\Controllers\CategoryController::class, 'delete']);
+    Route::prefix('category')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CategoryController::class, 'index']);
+        Route::get('/search', [\App\Http\Controllers\CategoryController::class, 'search']);
+        Route::get('/form/{method}/{id?}', [\App\Http\Controllers\CategoryController::class, 'formView'])->where('method', 'new|edit');
+        Route::post('/form/{method}/{id?}', [\App\Http\Controllers\CategoryController::class, 'formSubmit'])->where('method', 'new|edit');
+        Route::get('/view/{id}', [\App\Http\Controllers\CategoryController::class, 'singleView']);
+        Route::get('/view/{id}/pdf', [\App\Http\Controllers\CategoryController::class, 'printView']);
+        Route::delete('/delete/{id}', [\App\Http\Controllers\CategoryController::class, 'delete']);
+    });
 });

@@ -14,11 +14,49 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        // \App\Models\User::factory(10)->create();
+        // 1. Buat Data Kategori
+        $categoriesData = [
+            ['kode' => 'KTG-01', 'nama' => 'Obat Bebas'],
+            ['kode' => 'KTG-02', 'nama' => 'Obat Resep'],
+            ['kode' => 'KTG-03', 'nama' => 'Peralatan Bedah'],
+            ['kode' => 'KTG-04', 'nama' => 'Perlengkapan Umum'],
+            ['kode' => 'KTG-05', 'nama' => 'Vitamin & Suplemen'],
+        ];
 
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
+        foreach ($categoriesData as $cat) {
+            \App\Models\Category::firstOrCreate(['kode' => $cat['kode']], $cat);
+        }
+
+        $categories = \App\Models\Category::all();
+
+        // 2. Buat Data Barang (Master Items) sebanyak 10.000 menggunakan Increment
+        $suppliers = ['Tokopaedi', 'Bukulapuk', 'TokoBagas', 'E Commurz', 'Blublu'];
+        $jenises = ['Obat', 'Alkes', 'Matkes', 'Umum', 'ATK'];
+        $categoryIds = $categories->pluck('id')->toArray();
+        $totalCategories = count($categoryIds);
+
+        // Gunakan Transaction agar proses insert 10.000 data jauh lebih cepat
+        \Illuminate\Support\Facades\DB::transaction(function () use ($suppliers, $jenises, $categoryIds, $totalCategories) {
+            for ($i = 1; $i <= 10000; $i++) {
+                $itemModel = new \App\Models\MasterItem();
+                $itemModel->kode = (string) \Illuminate\Support\Str::uuid(); 
+                $itemModel->nama = "Barang Dummy ke-" . $i;
+                $itemModel->harga_beli = rand(10, 1000) * 500; // Harga acak kelipatan 500
+                $itemModel->laba = rand(10, 50); // Laba 10% s/d 50%
+                $itemModel->supplier = $suppliers[array_rand($suppliers)];
+                $itemModel->jenis = $jenises[array_rand($jenises)];
+                $itemModel->save();
+
+                // Perbarui kode dengan padding ID
+                $itemModel->kode = str_pad((string)$itemModel->id, 5, '0', STR_PAD_LEFT);
+                $itemModel->save();
+
+                // Sambungkan ke 1 Kategori acak
+                if ($totalCategories > 0) {
+                    $randomCategory = $categoryIds[array_rand($categoryIds)];
+                    $itemModel->categories()->attach([$randomCategory]);
+                }
+            }
+        });
     }
 }

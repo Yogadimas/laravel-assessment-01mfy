@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\MasterItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use App\Exports\MasterItemsExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class MasterItemsController extends Controller
 {
@@ -32,95 +38,222 @@ class MasterItemsController extends Controller
             'hargamax' => 'harga maksimal'
         ]);
 
-        // 2. Pastikan Max >= Min
         $validator->after(function ($validator) use ($request) {
-            if (!$validator->errors()->has('hargamin') && !$validator->errors()->has('hargamax')
-                && $request->filled('hargamin') && $request->filled('hargamax')
-                && (int)$request->input('hargamax') < (int)$request->input('hargamin')) {
-                $validator->errors()->add('hargamax', 'Harga max harus >= harga min.');
+            if (!$validator->errors()->has('hargamin') &&
+                !$validator->errors()->has('hargamax') &&
+                $request->filled('hargamin') &&
+                $request->filled('hargamax') &&
+                $request->input('hargamin') > $request->input('hargamax')
+            ) {
+                $validator->errors()->add('hargamax', 'harga max harus lebih besar dari harga min.');
             }
         });
 
         $data = $validator->validate();
+
         $query = MasterItem::query();
 
-        // 3. Gunakan filled() pengganti empty() agar angka 0 tetap dihitung
-        if ($request->filled('kode')) $query->where('kode', $data['kode']);
-        if ($request->filled('nama')) $query->where('nama', 'like', '%' . $data['nama'] . '%');
+        // Total sebelum filter
+        $recordsTotal = MasterItem::count();
 
-        // 4. Pisahkan logika where harga_beli min dan max
-        if ($request->filled('hargamin')) $query->where('harga_beli', '>=', $data['hargamin']);
-        if ($request->filled('hargamax')) $query->where('harga_beli', '<=', $data['hargamax']);
+        if ($request->filled('kode')) {
+            $query->where('kode', $data['kode']);
+        }
+        if ($request->filled('nama')) {
+            $query->where('nama', 'like', '%' . $data['nama'] . '%');
+        }
+        if ($request->filled('hargamin')) {
+            $query->where('harga_beli', '>=', $data['hargamin']);
+        }
+        if ($request->filled('hargamax')) {
+            $query->where('harga_beli', '<=', $data['hargamax']);
+        }
+
+        // Total setelah filter
+        $recordsFiltered = $query->count();
+
+        // Limit dan Offset dari DataTables
+        $start = $request->input('start', 0);
+        $length = $request->input('length', 10);
+        if ($length == -1) $length = $recordsFiltered; // Jika "All" dipilih
+
+        // Sort (Order) dari DataTables
+        $columns = ['kode', 'nama', 'jenis', 'harga_beli', 'harga_beli', 'supplier'];
+        $orderColumnIndex = $request->input('order.0.column', 0);
+        $orderDirection = $request->input('order.0.dir', 'desc');
+        $orderColumn = $columns[$orderColumnIndex] ?? 'id';
+
+        $items = $query->select('kode', 'nama', 'jenis', 'harga_beli', 'laba', 'supplier')
+            ->orderBy($orderColumn, $orderDirection)
+            ->skip($start)
+            ->take($length)
+            ->get();
+
+        // Format data sebelum dikembalikan (agar browser tidak kerja keras mem-parsing)
+        $formattedData = $items->map(function($item) {
+            $hargaJual = round($item->harga_beli * (1 + $item->laba / 100));
+            return [
+                'kode' => $item->kode,
+                'nama' => $item->nama,
+                'jenis' => $item->jenis,
+                'harga_beli' => 'Rp ' . number_format($item->harga_beli, 0, ',', '.'),
+                'harga_jual' => 'Rp ' . number_format($hargaJual, 0, ',', '.'),
+                'supplier' => $item->supplier,
+                'action' => '<a class="btn btn-primary btn-sm" href="'.url('master-items/view').'/'.urlencode($item->kode).'">Lihat</a>'
+            ];
+        });
 
         return response()->json([
-            'status' => 200,
-            'data' => $query->select('kode', 'nama', 'jenis', 'harga_beli', 'laba', 'supplier')->orderBy('id')->get()
+            'draw' => intval($request->input('draw', 1)),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $formattedData,
         ]);
     }
 
     public function formView($method, $id = 0)
     {
-        if ($method == 'new') {
-            $item = [];
-        } else {
-            $item = MasterItem::findOrFail($id);
-        }
-        $data['item'] = $item;
-        $data['method'] = $method;
-        return view('master_items.form.index', $data);
+        abort_unless(in_array($method, ['new','edit'], true), 404);
+        $item = $method === 'new' ? new MasterItem : MasterItem::with('categories')->findOrFail($id);
+
+        // Ambil semua daftar kategori untuk dimunculkan di form
+        $categories = Category::orderBy('nama')->get();
+
+        // Ambil ID kategori lama (saat form error) ATAU dari database (saat edit)
+        $selectedCategoryIds = old('category_ids', $item->exists ? $item->categories->pluck('id')->all() : []);
+
+        return view('master_items.form.index', compact('item', 'method', 'categories', 'selectedCategoryIds'));
     }
 
     public function singleView($kode)
     {
-        $data['data'] = MasterItem::where('kode', $kode)->firstOrFail();
+        $data['data'] = MasterItem::with('categories')->where('kode', $kode)->firstOrFail();
         return view('master_items.single.index', $data);
+    }
+
+    public function downloadExcel(Request $request)
+    {
+        $kode = $request->input('kode');
+        $nama = $request->input('nama');
+        $hargamin = $request->input('hargamin');
+        $hargamax = $request->input('hargamax');
+        
+        return Excel::download(new MasterItemsExport($kode, $nama, $hargamin, $hargamax), 'master-items_' . time() . '.xlsx');
     }
 
     public function formSubmit(Request $request, $method, $id = 0)
     {
-        $request->validate([
+        $data = $request->validate([
             'nama' => 'required|string|max:255',
             'harga_beli' => 'required|integer|min:0',
             'laba' => 'required|integer|min:0',
             'supplier' => 'required|in:Tokopaedi,Bukulapuk,TokoBagas,E Commurz,Blublu',
-            'jenis' => 'required|in:Obat,Alkes,Matkes,Umum,ATK'
+            'jenis' => 'required|in:Obat,Alkes,Matkes,Umum,ATK',
+            'foto' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'distinct', Rule::exists('categories', 'id')->whereNull('deleted_at')],
         ], [
             'required' => 'Kolom :attribute wajib diisi.',
             'string' => 'Kolom :attribute harus berupa teks.',
             'max' => 'Kolom :attribute maksimal :max karakter.',
             'integer' => 'Kolom :attribute harus berupa angka bulat.',
             'min' => 'Kolom :attribute tidak boleh kurang dari :min.',
-            'in' => 'Pilihan :attribute tidak terdaftar di sistem.'
+            'in' => 'Pilihan :attribute tidak terdaftar di sistem.',
+            'image' => 'File harus berupa gambar.',
+            'mimes' => 'Format gambar harus jpeg, jpg, png, atau webp.',
         ], [
-            // Array Custom Attributes (Mengubah 'harga_beli' menjadi 'harga beli')
-            'harga_beli' => 'harga beli'
+            'harga_beli' => 'harga beli',
+            'foto' => 'foto barang'
         ]);
 
-        DB::transaction(function () use ($request, $method, $id) {
+        $categoryIds = $data['category_ids'] ?? [];
+        unset($data['category_ids']);
+
+        $fileFoto = $request->file('foto');
+        $fotoPath = null;
+        if ($fileFoto) {
+            // Gunakan Intervention Image untuk keamanan dan optimasi
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($fileFoto);
+            
+            // Resize jika gambar terlalu besar (menghindari beban server) dan strip EXIF otomatis saat konversi
+            $image->scaleDown(800, 800);
+            
+            // Simpan gambar dengan format jpg untuk standarisasi (sekaligus membuang payload yang mungkin ada di format lain)
+            // Simpan di disk 'local' agar tidak bisa diakses langsung via URL publik
+            $filename = 'foto-items/' . Str::uuid() . '.jpg';
+            \Illuminate\Support\Facades\Storage::disk('local')->put($filename, $image->toJpeg(80)->toString());
+            
+            $fotoPath = $filename;
+        }
+
+        try {
+            DB::beginTransaction();
             if ($method == 'new') {
                 $data_item = new MasterItem;
-                // Set kode sementara (UUID/acak) agar lolos validasi saat di-save yang pertama
                 $data_item->kode = (string)Str::uuid();
             } else {
                 $data_item = MasterItem::findOrFail($id);
             }
+
+            $oldFoto = $data_item->foto;
+            $shouldDeleteOldFoto = false;
 
             $data_item->nama = $request->nama;
             $data_item->harga_beli = $request->harga_beli;
             $data_item->laba = $request->laba;
             $data_item->supplier = $request->supplier;
             $data_item->jenis = $request->jenis;
+            if ($fotoPath) {
+                $data_item->foto = $fotoPath;
+                $shouldDeleteOldFoto = true;
+            } elseif ($request->has('hapus_foto')) {
+                $data_item->foto = null;
+                $shouldDeleteOldFoto = true;
+            }
             $data_item->save();
+            $data_item->categories()->sync($categoryIds);
 
             if ($method == 'new') {
-                // Setelah disave, baru kita dapatkan ID unik Auto Increment-nya (Tahan Tabrakan)
-                // Jadikan kode unik sesungguhnya, lalu timpa save lagi.
-                $data_item->kode = str_pad((string)$data_item->id, 5, '0', STR_PAD_LEFT);
+                $data_item->kode = str_pad($data_item->id, 5, '0', STR_PAD_LEFT);
                 $data_item->save();
             }
-        });
+
+            DB::commit();
+
+            if ($shouldDeleteOldFoto && $oldFoto) {
+                if (\Illuminate\Support\Facades\Storage::disk('local')->exists($oldFoto)) {
+                    \Illuminate\Support\Facades\Storage::disk('local')->delete($oldFoto);
+                } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($oldFoto)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($oldFoto);
+                }
+            }
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if ($fotoPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($fotoPath)) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($fotoPath);
+            }
+            throw $e;
+        }
 
         return redirect('master-items')->with('success', 'Data item "' . $request->nama . '" berhasil disimpan!');
+    }
+
+    public function showFoto($filename)
+    {
+        $path = 'foto-items/' . $filename;
+        
+        // Cek di disk 'local' (terbaru)
+        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+            return response()->file(storage_path('app/' . $path));
+        }
+        
+        // Fallback: Cek di disk 'public' (untuk foto lama)
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            return response()->file(storage_path('app/public/' . $path));
+        }
+
+        abort(404);
     }
 
     public function delete($id)

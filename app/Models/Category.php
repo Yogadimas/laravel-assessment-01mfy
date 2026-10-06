@@ -11,7 +11,7 @@ class Category extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['kode', 'nama'];
+    protected $fillable = ["kode", "nama"];
 
     public function masterItems(): BelongsToMany
     {

@@ -4,11 +4,12 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="form-group mb-2">
-                <a href="{{url('master-items/form/new')}}" class="btn btn-secondary">+ Master Items Baru</a>
+            <div class="form-group mb-2 d-flex gap-2">
+                <a href="{{url('master-items/form/new')}}" class="btn btn-primary">+ Tambah Data Barang</a>
+                <a href="{{url('category')}}" class="btn btn-outline-primary">Kelola Kategori</a>
             </div>
             <div class="card">
-                <div class="card-header">Daftar Master Items</div>
+                <div class="card-header">Daftar Barang</div>
 
                 <div class="card-body">
                     @if (session('success'))
@@ -26,11 +27,11 @@
 </div>
 @endsection
 @section('js')
-    <script>
-        // Menghilangkan alert otomatis setelah 3 detik (3000 ms)
-        setTimeout(function() {
-            $('.alert-success').fadeOut('slow');
-        }, 3000);
-    </script>
-    @include('master_items.index.js')
+<script>
+    // Menghilangkan alert otomatis setelah 3 detik (3000 ms)
+    setTimeout(function() {
+        $('.alert-success').fadeOut('slow');
+    }, 3000);
+</script>
+@include('master_items.index.js')
 @endsection
