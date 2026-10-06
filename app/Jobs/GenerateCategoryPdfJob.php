@@ -38,7 +38,7 @@ class GenerateCategoryPdfJob implements ShouldQueue
         $category = Category::findOrFail($p['category_id']);
         $total = $category->masterItems()->count();
         $items = $category->masterItems()->orderBy('id')->offset($offset)->limit($batas)->get();
-        $dicetak_pada = now();
+        $dicetak_pada = now('Asia/Jakarta');
 
         $output = Pdf::loadView('category.pdf', compact('category', 'items', 'total', 'batas', 'dicetak_pada', 'page', 'offset'))
             ->setPaper('a4', 'portrait')

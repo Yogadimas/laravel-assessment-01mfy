@@ -92,7 +92,7 @@
         <tr>
             <th>Jumlah Item</th>
             <td>:</td>
-            <td>{{ $total }}@if($total > $batas) (ditampilkan {{ $batas }} pertama)@endif</td>
+            <td>{{ $total }}@if($total > $batas) (bagian {{ $page }}: data ke-{{ $offset + 1 }} sampai {{ $offset + $items->count() }})@endif</td>
         </tr>
     </table>
 
@@ -113,7 +113,7 @@
             @forelse($items as $item)
             @php $hargaJual = $item->harga_jual; @endphp
             <tr>
-                <td class="tengah">{{ $loop->iteration }}</td>
+                <td class="tengah">{{ $offset + $loop->iteration }}</td>
                 <td>{{ $item->kode }}</td>
                 <td>{{ $item->nama }}</td>
                 <td>{{ $item->jenis }}</td>

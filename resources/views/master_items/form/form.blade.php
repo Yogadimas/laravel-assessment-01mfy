@@ -1,5 +1,3 @@
-<form method="POST">
-    @csrf
     @if($method == 'edit')
         <div class="form-group">
             <label>Kode Barang</label>
@@ -104,5 +102,3 @@
     </div>
 
     <button class="btn btn-primary mt-3">Submit</button>
-
-</form>

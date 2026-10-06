@@ -83,30 +83,26 @@
                 @php
                     $totalItems = $category->masterItems->count();
                     $batas = 100;
-                    $totalPages = ceil($totalItems / $batas);
+                    $totalPages = max(1, (int) ceil($totalItems / $batas));
                 @endphp
                 <p>Terdapat <strong>{{ $totalItems }}</strong> barang dalam kategori ini.</p>
                 <p>Untuk menghindari kegagalan sistem, maksimal data yang dapat didownload per file PDF adalah <strong>{{ $batas }}</strong> data. Silakan pilih bagian yang ingin diunduh:</p>
                 
-                @if($totalItems > 0)
-                    <div class="list-group mt-3">
-                        @for($i = 1; $i <= $totalPages; $i++)
-                            @php
-                                $start = (($i - 1) * $batas) + 1;
-                                $end = min($i * $batas, $totalItems);
-                            @endphp
-                            <button type="button" data-page="{{ $i }}" class="btn-download-pdf list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-0">Part {{ $i }}</h6>
-                                    <small class="text-muted">Data ke-{{ $start }} sampai {{ $end }}</small>
-                                </div>
-                                <span class="badge bg-primary rounded-pill">Download</span>
-                            </button>
-                        @endfor
-                    </div>
-                @else
-                    <div class="alert alert-warning mb-0">Belum ada data barang untuk diunduh.</div>
-                @endif
+                <div class="list-group mt-3">
+                    @for($i = 1; $i <= $totalPages; $i++)
+                        @php
+                            $start = $totalItems > 0 ? (($i - 1) * $batas) + 1 : 0;
+                            $end = min($i * $batas, $totalItems);
+                        @endphp
+                        <button type="button" data-page="{{ $i }}" class="btn-download-pdf list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0">Part {{ $i }}</h6>
+                                <small class="text-muted">@if($totalItems > 0)Data ke-{{ $start }} sampai {{ $end }}@else Belum ada barang (PDF kosong) @endif</small>
+                            </div>
+                            <span class="badge bg-primary rounded-pill">Download</span>
+                        </button>
+                    @endfor
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
