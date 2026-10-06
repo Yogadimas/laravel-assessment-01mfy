@@ -9,6 +9,7 @@ use App\Http\Requests\MasterItemSearchRequest;
 use App\Http\Resources\MasterItemResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -119,7 +120,7 @@ class MasterItemsController extends Controller
                 // Simpan gambar dengan format jpg untuk standarisasi (sekaligus membuang payload yang mungkin ada di format lain)
                 // Simpan di disk 'local' agar tidak bisa diakses langsung via URL publik
                 $filename = 'foto-items/' . Str::uuid() . '.jpg';
-                \Illuminate\Support\Facades\Storage::disk('local')->put($filename, $image->toJpeg(80)->toString());
+                Storage::disk('local')->put($filename, $image->toJpeg(80)->toString());
             } catch (\Throwable $e) {
                 report($e);
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -165,16 +166,16 @@ class MasterItemsController extends Controller
             DB::commit();
 
             if ($shouldDeleteOldFoto && $oldFoto) {
-                if (\Illuminate\Support\Facades\Storage::disk('local')->exists($oldFoto)) {
-                    \Illuminate\Support\Facades\Storage::disk('local')->delete($oldFoto);
-                } elseif (\Illuminate\Support\Facades\Storage::disk('public')->exists($oldFoto)) {
-                    \Illuminate\Support\Facades\Storage::disk('public')->delete($oldFoto);
+                if (Storage::disk('local')->exists($oldFoto)) {
+                    Storage::disk('local')->delete($oldFoto);
+                } elseif (Storage::disk('public')->exists($oldFoto)) {
+                    Storage::disk('public')->delete($oldFoto);
                 }
             }
         } catch (\Exception $e) {
             DB::rollBack();
-            if ($fotoPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($fotoPath)) {
-                \Illuminate\Support\Facades\Storage::disk('local')->delete($fotoPath);
+            if ($fotoPath && Storage::disk('local')->exists($fotoPath)) {
+                Storage::disk('local')->delete($fotoPath);
             }
             throw $e;
         }
@@ -191,14 +192,14 @@ class MasterItemsController extends Controller
         }
 
         $path = 'foto-items/' . $filename;
-        
+
         // Cek di disk 'local' (terbaru)
-        if (\Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+        if (Storage::disk('local')->exists($path)) {
             return response()->file(storage_path('app/' . $path));
         }
-        
+
         // Fallback: Cek di disk 'public' (untuk foto lama)
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+        if (Storage::disk('public')->exists($path)) {
             return response()->file(storage_path('app/public/' . $path));
         }
 
