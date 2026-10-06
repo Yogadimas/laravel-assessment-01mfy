@@ -26,7 +26,11 @@
                     <div class="d-flex flex-wrap gap-2">
                         <a class="btn btn-info text-white" href="{{url('category/form/edit')}}/{{$category->id}}">Ubah</a>
                         <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modal-download-pdf">Download PDF</button>
-                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modal-konfirmasi-hapus" data-url="{{url('category/delete')}}/{{$category->id}}" data-pesan="Yakin ingin menghapus kategori {{ $category->nama }}?">Hapus</button>
+                        <form action="{{ url('category/delete/'.$category->id) }}" method="POST" class="m-0">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Yakin ingin menghapus kategori {{ $category->nama }}?');">Hapus</button>
+                        </form>
                     </div>
 
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 mb-2">
