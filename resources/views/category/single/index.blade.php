@@ -91,13 +91,13 @@
                                 $start = (($i - 1) * $batas) + 1;
                                 $end = min($i * $batas, $totalItems);
                             @endphp
-                            <a href="{{ url('category/view') }}/{{ $category->id }}/pdf?page={{ $i }}" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <button type="button" data-page="{{ $i }}" class="btn-download-pdf list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-0">Part {{ $i }}</h6>
                                     <small class="text-muted">Data ke-{{ $start }} sampai {{ $end }}</small>
                                 </div>
                                 <span class="badge bg-primary rounded-pill">Download</span>
-                            </a>
+                            </button>
                         @endfor
                     </div>
                 @else
@@ -112,4 +112,13 @@
 </div>
 @endsection
 @section('js')
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+@include('partials.export-js')
+<script>
+    $(document).on('click', '.btn-download-pdf', function () {
+        var $btn = $(this);
+        requestExport('{{ url('exports/category-pdf/' . $category->id) }}', { page: $btn.data('page') }, null);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-download-pdf')).hide();
+    });
+</script>
 @endsection

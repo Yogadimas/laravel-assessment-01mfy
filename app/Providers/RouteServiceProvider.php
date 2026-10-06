@@ -48,5 +48,30 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
+
+        // Pencarian AJAX DataTables
+        RateLimiter::for('search', function (Request $request) {
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Fitur berat: export Excel
+        RateLimiter::for('export_limit', function (Request $request) {
+            return Limit::perMinute(5)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Fitur berat: cetak/download PDF
+        RateLimiter::for('pdf_limit', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Aksi tulis (simpan/hapus) dan upload foto
+        RateLimiter::for('write', function (Request $request) {
+            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Akses foto privat
+        RateLimiter::for('foto', function (Request $request) {
+            return Limit::perMinute(240)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

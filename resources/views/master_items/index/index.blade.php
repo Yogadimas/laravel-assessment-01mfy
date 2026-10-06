@@ -33,5 +33,6 @@
         $('.alert-success').fadeOut('slow');
     }, 3000);
 </script>
+@include('partials.export-js')
 @include('master_items.index.js')
 @endsection

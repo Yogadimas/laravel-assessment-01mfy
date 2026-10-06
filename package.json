@@ -2,12 +2,16 @@
     "private": true,
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "serve": "php artisan serve",
+        "queue": "php artisan queue:work --tries=1 --timeout=600",
+        "start": "concurrently -n web,queue,vite -c blue,green,magenta \"npm run serve\" \"npm run queue\" \"npm run dev\""
     },
     "devDependencies": {
         "@popperjs/core": "^2.10.2",
         "axios": "^1.1.2",
         "bootstrap": "^5.2.1",
+        "concurrently": "^8.2.2",
         "laravel-vite-plugin": "^0.6.0",
         "lodash": "^4.17.19",
         "postcss": "^8.1.14",

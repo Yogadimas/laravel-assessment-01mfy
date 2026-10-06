@@ -62,6 +62,12 @@
                 { data: 'supplier' },
                 { data: 'action', orderable: false, searchable: false }
             ],
+            columnDefs: [
+                {
+                    targets: [0, 1, 2, 3, 4, 5],
+                    render: $.fn.dataTable.render.text()
+                }
+            ],
             drawCallback: function(settings) {
                 var api = this.api();
                 var info = api.page.info();
@@ -115,22 +121,12 @@
         });
 
         $('#btn-export-excel').on('click', function() {
-            var url = '{{url("master-items/excel")}}';
-            var kode = $('#filter-kode').val();
-            var nama = $('#filter-nama').val();
-            var hargamin = $('#filter-harga-min').val();
-            var hargamax = $('#filter-harga-max').val();
-            
-            var params = [];
-            if (kode) params.push('kode=' + encodeURIComponent(kode));
-            if (nama) params.push('nama=' + encodeURIComponent(nama));
-            if (hargamin) params.push('hargamin=' + encodeURIComponent(hargamin));
-            if (hargamax) params.push('hargamax=' + encodeURIComponent(hargamax));
-            
-            if (params.length > 0) {
-                url += '?' + params.join('&');
-            }
-            window.location.href = url;
+            requestExport('{{url("exports/master-items-excel")}}', {
+                kode: $('#filter-kode').val(),
+                nama: $('#filter-nama').val(),
+                hargamin: $('#filter-harga-min').val(),
+                hargamax: $('#filter-harga-max').val()
+            }, $(this));
         });
     });
 </script>

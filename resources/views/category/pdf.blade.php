@@ -111,7 +111,7 @@
         </thead>
         <tbody>
             @forelse($items as $item)
-            @php $hargaJual = round($item->harga_beli * (1 + $item->laba / 100)); @endphp
+            @php $hargaJual = $item->harga_jual; @endphp
             <tr>
                 <td class="tengah">{{ $loop->iteration }}</td>
                 <td>{{ $item->kode }}</td>

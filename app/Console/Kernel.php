@@ -16,6 +16,15 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // $schedule->command('inspire')->hourly();
+
+        // Hapus file hasil export yang lebih dari 1 hari
+        $schedule->call(function () {
+            \App\Models\ReportExport::where('created_at', '<', now()->subDay())
+                ->each(function ($export) {
+                    $export->deleteFile();
+                    $export->delete();
+                });
+        })->daily();
     }
 
     /**

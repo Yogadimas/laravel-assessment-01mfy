@@ -12,6 +12,14 @@ class MasterItem extends Model
     use HasFactory;
     use SoftDeletes;
 
+    /**
+     * Harga jual = harga beli + laba (%), dibulatkan.
+     */
+    public function getHargaJualAttribute(): int
+    {
+        return (int) round($this->harga_beli * (1 + $this->laba / 100));
+    }
+
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(

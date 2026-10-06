@@ -67,7 +67,6 @@ class MasterItemsExport implements FromQuery, WithHeadings, WithMapping, WithSty
     public function map($item): array
     {
         $this->rowNumber++;
-        $hargaJual = $item->harga_beli + ($item->harga_beli * $item->laba / 100);
 
         return [
             $this->rowNumber,
@@ -76,7 +75,7 @@ class MasterItemsExport implements FromQuery, WithHeadings, WithMapping, WithSty
             $item->supplier ?: '-',
             $item->harga_beli,
             $item->laba,
-            round($hargaJual)
+            $item->harga_jual
         ];
     }
 

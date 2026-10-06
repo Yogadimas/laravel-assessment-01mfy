@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\MasterItem;
+use App\Http\Requests\MasterItemFormRequest;
+use App\Http\Requests\MasterItemSearchRequest;
+use App\Http\Resources\MasterItemResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -21,35 +24,9 @@ class MasterItemsController extends Controller
         return view('master_items.index.index');
     }
 
-    public function search(Request $request)
+    public function search(MasterItemSearchRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'kode' => 'nullable|string|max:255',
-            'nama' => 'nullable|string|max:255',
-            'hargamin' => 'nullable|integer|min:0',
-            'hargamax' => 'nullable|integer|min:0',
-        ], [
-            'min' => 'Isian :attribute tidak boleh kurang dari 0.',
-            'max' => 'Isian :attribute tidak boleh lebih dari :max karakter.',
-            'string' => 'Isian :attribute harus berupa teks.',
-            'integer' => 'Isian :attribute harus berupa angka bulat.'
-        ], [
-            'hargamin' => 'harga minimal',
-            'hargamax' => 'harga maksimal'
-        ]);
-
-        $validator->after(function ($validator) use ($request) {
-            if (!$validator->errors()->has('hargamin') &&
-                !$validator->errors()->has('hargamax') &&
-                $request->filled('hargamin') &&
-                $request->filled('hargamax') &&
-                $request->input('hargamin') > $request->input('hargamax')
-            ) {
-                $validator->errors()->add('hargamax', 'harga max harus lebih besar dari harga min.');
-            }
-        });
-
-        $data = $validator->validate();
+        $data = $request->validated();
 
         $query = MasterItem::query();
 
@@ -89,25 +66,11 @@ class MasterItemsController extends Controller
             ->take($length)
             ->get();
 
-        // Format data sebelum dikembalikan (agar browser tidak kerja keras mem-parsing)
-        $formattedData = $items->map(function($item) {
-            $hargaJual = round($item->harga_beli * (1 + $item->laba / 100));
-            return [
-                'kode' => $item->kode,
-                'nama' => $item->nama,
-                'jenis' => $item->jenis,
-                'harga_beli' => 'Rp ' . number_format($item->harga_beli, 0, ',', '.'),
-                'harga_jual' => 'Rp ' . number_format($hargaJual, 0, ',', '.'),
-                'supplier' => $item->supplier,
-                'action' => '<a class="btn btn-primary btn-sm" href="'.url('master-items/view').'/'.urlencode($item->kode).'">Lihat</a>'
-            ];
-        });
-
         return response()->json([
             'draw' => intval($request->input('draw', 1)),
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
-            'data' => $formattedData,
+            'data' => MasterItemResource::collection($items)->resolve(),
         ]);
     }
 
@@ -131,40 +94,9 @@ class MasterItemsController extends Controller
         return view('master_items.single.index', $data);
     }
 
-    public function downloadExcel(Request $request)
+    public function formSubmit(MasterItemFormRequest $request, $method, $id = 0)
     {
-        $kode = $request->input('kode');
-        $nama = $request->input('nama');
-        $hargamin = $request->input('hargamin');
-        $hargamax = $request->input('hargamax');
-        
-        return Excel::download(new MasterItemsExport($kode, $nama, $hargamin, $hargamax), 'master-items_' . time() . '.xlsx');
-    }
-
-    public function formSubmit(Request $request, $method, $id = 0)
-    {
-        $data = $request->validate([
-            'nama' => 'required|string|max:255',
-            'harga_beli' => 'required|integer|min:0',
-            'laba' => 'required|integer|min:0',
-            'supplier' => 'required|in:Tokopaedi,Bukulapuk,TokoBagas,E Commurz,Blublu',
-            'jenis' => 'required|in:Obat,Alkes,Matkes,Umum,ATK',
-            'foto' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
-            'category_ids' => ['nullable', 'array'],
-            'category_ids.*' => ['integer', 'distinct', Rule::exists('categories', 'id')->whereNull('deleted_at')],
-        ], [
-            'required' => 'Kolom :attribute wajib diisi.',
-            'string' => 'Kolom :attribute harus berupa teks.',
-            'max' => 'Kolom :attribute maksimal :max karakter.',
-            'integer' => 'Kolom :attribute harus berupa angka bulat.',
-            'min' => 'Kolom :attribute tidak boleh kurang dari :min.',
-            'in' => 'Pilihan :attribute tidak terdaftar di sistem.',
-            'image' => 'File harus berupa gambar.',
-            'mimes' => 'Format gambar harus jpeg, jpg, png, atau webp.',
-        ], [
-            'harga_beli' => 'harga beli',
-            'foto' => 'foto barang'
-        ]);
+        $data = $request->validated();
 
         $categoryIds = $data['category_ids'] ?? [];
         unset($data['category_ids']);
@@ -172,18 +104,25 @@ class MasterItemsController extends Controller
         $fileFoto = $request->file('foto');
         $fotoPath = null;
         if ($fileFoto) {
-            // Gunakan Intervention Image untuk keamanan dan optimasi
-            $manager = new ImageManager(new Driver());
-            $image = $manager->read($fileFoto);
-            
-            // Resize jika gambar terlalu besar (menghindari beban server) dan strip EXIF otomatis saat konversi
-            $image->scaleDown(800, 800);
-            
-            // Simpan gambar dengan format jpg untuk standarisasi (sekaligus membuang payload yang mungkin ada di format lain)
-            // Simpan di disk 'local' agar tidak bisa diakses langsung via URL publik
-            $filename = 'foto-items/' . Str::uuid() . '.jpg';
-            \Illuminate\Support\Facades\Storage::disk('local')->put($filename, $image->toJpeg(80)->toString());
-            
+            try {
+                // Gunakan Intervention Image untuk keamanan dan optimasi
+                $manager = new ImageManager(new Driver());
+                $image = $manager->read($fileFoto);
+
+                // Resize jika gambar terlalu besar (menghindari beban server) dan strip EXIF otomatis saat konversi
+                $image->scaleDown(800, 800);
+
+                // Simpan gambar dengan format jpg untuk standarisasi (sekaligus membuang payload yang mungkin ada di format lain)
+                // Simpan di disk 'local' agar tidak bisa diakses langsung via URL publik
+                $filename = 'foto-items/' . Str::uuid() . '.jpg';
+                \Illuminate\Support\Facades\Storage::disk('local')->put($filename, $image->toJpeg(80)->toString());
+            } catch (\Throwable $e) {
+                report($e);
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'foto' => 'Gambar tidak valid atau rusak, silakan unggah file gambar lain.',
+                ]);
+            }
+
             $fotoPath = $filename;
         }
 
@@ -241,6 +180,12 @@ class MasterItemsController extends Controller
 
     public function showFoto($filename)
     {
+        // Cegah path traversal: hanya nama file polos dengan pola yang diizinkan
+        $filename = basename($filename);
+        if (!preg_match('/^[A-Za-z0-9\-_]+\.(jpe?g|png|webp)$/i', $filename)) {
+            abort(404);
+        }
+
         $path = 'foto-items/' . $filename;
         
         // Cek di disk 'local' (terbaru)
