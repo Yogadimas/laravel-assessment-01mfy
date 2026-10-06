@@ -72,4 +72,77 @@ class MasterItemsTest extends TestCase
         $responseAuth = $this->actingAs($user)->get('/rute-ngawur-tidak-ada');
         $responseAuth->assertRedirect('/home');
     }
+
+    /**
+     * Uji alur lengkap CRUD Master Items dan relasinya dengan kategori.
+     */
+    public function test_full_crud_master_items_lifecycle()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Siapkan Kategori Dummy untuk relasi
+        $kategori = \App\Models\Category::create([
+            'kode' => 'KTG-REL-1',
+            'nama' => 'Kategori Relasi'
+        ]);
+
+        // 1. CREATE (Tambah Barang)
+        $barangData = [
+            'nama' => 'Obat Sakit Kepala',
+            'jenis' => 'Obat',
+            'supplier' => 'TokoBagas',
+            'harga_beli' => 1000,
+            'laba' => 20,
+            'category_ids' => [$kategori->id] // Pilih kategori
+        ];
+        
+        $responseCreate = $this->post('/master-items/form/new', $barangData);
+        $responseCreate->assertStatus(302);
+        
+        // Pastikan masuk database, field kode otomatis di-generate (jadi tidak kita tes persis stringnya)
+        $this->assertDatabaseHas('master_items', [
+            'nama' => 'Obat Sakit Kepala',
+            'jenis' => 'Obat'
+        ]);
+
+        $barang = \App\Models\MasterItem::where('nama', 'Obat Sakit Kepala')->first();
+        
+        // Pastikan relasi Many-To-Many (Kategori) tersimpan
+        $this->assertTrue($barang->categories->contains($kategori->id));
+
+        // 2. READ (Membaca halaman detail barang)
+        $responseRead = $this->get('/master-items/view/' . $barang->kode);
+        $responseRead->assertStatus(200);
+        $responseRead->assertSee('Obat Sakit Kepala');
+        $responseRead->assertSee('Kategori Relasi'); // Kategorinya juga muncul di View
+
+        // 3. UPDATE (Ubah Barang)
+        $barangUpdateData = [
+            'nama' => 'Obat Batuk',
+            'jenis' => 'Obat',
+            'supplier' => 'Tokopaedi',
+            'harga_beli' => 2000,
+            'laba' => 15,
+            'category_ids' => [] // Kosongkan kategorinya
+        ];
+
+        $responseUpdate = $this->post('/master-items/form/edit/' . $barang->id, $barangUpdateData);
+        $responseUpdate->assertStatus(302);
+
+        $this->assertDatabaseHas('master_items', [
+            'id' => $barang->id,
+            'nama' => 'Obat Batuk'
+        ]);
+
+        // 4. DELETE (Hapus Barang)
+        $responseDelete = $this->delete('/master-items/delete/' . $barang->id);
+        $responseDelete->assertStatus(302); // Redirect back
+
+        // Karena sistem menggunakan soft deletes, master items tidak benar-benar hilang tapi deleted_at terisi
+        $this->assertDatabaseMissing('master_items', [
+            'id' => $barang->id,
+            'deleted_at' => null
+        ]);
+    }
 }
