@@ -1,6 +1,6 @@
-﻿# Medify Assessment
+﻿# Assessment
 
-Aplikasi Laravel 9 untuk mengelola Master Items (ada upload foto) dan Kategori (relasi many-to-many dengan item). Export Excel dan PDF dikerjakan lewat queue, jadi tidak membuat halaman menggantung.
+Aplikasi Laravel 9 untuk mengelola Master Items (ada upload foto) dan Kategori (relasi many-to-many dengan item). Export Excel dan PDF dikerjakan lewat queue, jadi tidak membuat halaman menunggu.
 
 ## Yang dibutuhkan
 

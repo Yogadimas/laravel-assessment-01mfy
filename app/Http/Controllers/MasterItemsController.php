@@ -83,7 +83,11 @@ class MasterItemsController extends Controller
         $categories = Category::orderBy('nama')->get();
 
         // Ambil ID kategori lama (saat form error) ATAU dari database (saat edit)
-        $selectedCategoryIds = old('category_ids', $item->exists ? $item->categories->pluck('id')->all() : []);
+        $defaultCategories = $item->exists ? $item->categories->pluck('id')->all() : [];
+        if (!$item->exists && request()->has('category')) {
+            $defaultCategories = [request()->query('category')];
+        }
+        $selectedCategoryIds = old('category_ids', $defaultCategories);
 
         return view('master_items.form.index', compact('item', 'method', 'categories', 'selectedCategoryIds'));
     }

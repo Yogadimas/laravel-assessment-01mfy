@@ -4,20 +4,27 @@ namespace App\Exports;
 
 use App\Models\MasterItem;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class MasterItemsExport implements FromQuery, WithHeadings, WithMapping, WithStyles, ShouldAutoSize, WithColumnFormatting, WithTitle
+class MasterItemsExport implements FromQuery, ShouldAutoSize, WithColumnFormatting, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected $kode;
+
     protected $nama;
+
     protected $hargamin;
+
     protected $hargamax;
+
     protected $rowNumber = 0;
 
     public function __construct($kode = null, $nama = null, $hargamin = null, $hargamax = null)
@@ -31,13 +38,13 @@ class MasterItemsExport implements FromQuery, WithHeadings, WithMapping, WithSty
     public function query()
     {
         $query = MasterItem::query()->with('categories');
-        
-        if (!empty($this->kode)) {
+
+        if (! empty($this->kode)) {
             $query->where('kode', $this->kode);
         }
-        
-        if (!empty($this->nama)) {
-            $query->where('nama', 'like', '%' . $this->nama . '%');
+
+        if (! empty($this->nama)) {
+            $query->where('nama', 'like', '%'.$this->nama.'%');
         }
 
         if ($this->hargamin !== null && $this->hargamin !== '') {
@@ -60,7 +67,7 @@ class MasterItemsExport implements FromQuery, WithHeadings, WithMapping, WithSty
             'Supplier',
             'Harga Beli',
             'Laba',
-            'Harga Jual'
+            'Harga Jual',
         ];
     }
 
@@ -75,14 +82,42 @@ class MasterItemsExport implements FromQuery, WithHeadings, WithMapping, WithSty
             $item->supplier ?: '-',
             $item->harga_beli,
             $item->laba,
-            $item->harga_jual
+            $item->harga_jual,
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
+        $highestRow = $sheet->getHighestRow();
+        $highestColumn = $sheet->getHighestColumn();
+
         return [
-            1 => ['font' => ['bold' => true]],
+            // Style untuk seluruh tabel (Border hitam)
+            'A1:'.$highestColumn.$highestRow => [
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['argb' => 'FF000000'], // Hitam
+                    ],
+                ],
+            ],
+            // Style khusus Header (Baris 1)
+            1 => [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['argb' => 'FFFFFFFF'], // Teks putih
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => [
+                        'argb' => 'FF198754', // Background Hijau (estetik)
+                    ],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+            ],
         ];
     }
 
