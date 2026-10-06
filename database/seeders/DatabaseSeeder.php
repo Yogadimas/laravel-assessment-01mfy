@@ -29,15 +29,15 @@ class DatabaseSeeder extends Seeder
 
         $categories = \App\Models\Category::all();
 
-        // 2. Buat Data Barang (Master Items) sebanyak 10.000 menggunakan Increment
+        // 2. Buat Data Barang (Master Items) sebanyak 200 menggunakan Increment
         $suppliers = ['Tokopaedi', 'Bukulapuk', 'TokoBagas', 'E Commurz', 'Blublu'];
         $jenises = ['Obat', 'Alkes', 'Matkes', 'Umum', 'ATK'];
         $categoryIds = $categories->pluck('id')->toArray();
         $totalCategories = count($categoryIds);
 
-        // Gunakan Transaction agar proses insert 10.000 data jauh lebih cepat
+        // Gunakan Transaction agar proses insert 200 data jauh lebih cepat
         \Illuminate\Support\Facades\DB::transaction(function () use ($suppliers, $jenises, $categoryIds, $totalCategories) {
-            for ($i = 1; $i <= 10000; $i++) {
+            for ($i = 1; $i <= 200; $i++) {
                 $itemModel = new \App\Models\MasterItem();
                 $itemModel->kode = (string) \Illuminate\Support\Str::uuid(); 
                 $itemModel->nama = "Barang Dummy ke-" . $i;
